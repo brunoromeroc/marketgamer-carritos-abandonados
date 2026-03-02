@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tracking de Envíos — Market Gamer</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #06080a;
+    --surface: #0c0f12;
+    --surface2: #111518;
+    --surface3: #181d22;
+    --border: #1c2228;
+    --border2: #252d35;
+    --text: #dce4ed;
+    --muted: #4a5a6a;
+    --muted2: #6a7f92;
+    --accent: #009EE3;
+    --accent-glow: rgba(0,158,227,0.15);
+    --accent-dim: #001f30;
+    --green: #22c55e;
+    --green-dim: #052010;
+    --yellow: #f59e0b;
+    --yellow-dim: #1a1200;
+    --red: #ef4444;
+    --red-dim: #1a0505;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "IBM Plex Sans", sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* Fondo con líneas de grilla tipo terminal */
+  body::before {
+    content: "";
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(0,158,227,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,158,227,0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  body::after {
+    content: "";
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(0,158,227,0.06) 0%, transparent 60%);
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; padding: 60px 24px 80px; }
+
+  /* Header */
+  .logo-row {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 48px;
+  }
+  .logo-badge {
+    background: var(--accent); color: #06080a;
+    font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.1em; padding: 6px 10px; border-radius: 4px;
+  }
+  .logo-text {
+    font-family: "IBM Plex Mono", monospace; font-size: 12px;
+    color: var(--muted2); letter-spacing: 0.15em; text-transform: uppercase;
+  }
+
+  .hero-title {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: clamp(28px, 5vw, 42px); font-weight: 700;
+    line-height: 1.1; margin-bottom: 12px;
+    color: var(--text);
+  }
+  .hero-title span { color: var(--accent); }
+  .hero-sub {
+    font-size: 15px; color: var(--muted2); margin-bottom: 40px; line-height: 1.6;
+  }
+
+  /* Buscador */
+  .search-box {
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 12px; padding: 6px 6px 6px 20px;
+    display: flex; align-items: center; gap: 12px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    margin-bottom: 16px;
+  }
+  .search-box:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  .search-prefix {
+    font-family: "IBM Plex Mono", monospace; font-size: 13px;
+    color: var(--muted); white-space: nowrap; flex-shrink: 0;
+  }
+  .search-input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text); font-family: "IBM Plex Mono", monospace;
+    font-size: 20px; font-weight: 600; letter-spacing: 0.05em;
+    padding: 8px 0;
+  }
+  .search-input::placeholder { color: var(--muted); font-weight: 400; font-size: 16px; }
+  .search-btn {
+    background: var(--accent); border: none; border-radius: 8px;
+    padding: 14px 28px; color: #06080a; font-family: "IBM Plex Sans", sans-serif;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; gap: 8px; transition: all 0.2s;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .search-btn:hover { background: #00b8ff; transform: translateY(-1px); }
+  .search-btn:active { transform: translateY(0); }
+  .search-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .search-hint { font-size: 12px; color: var(--muted); font-family: "IBM Plex Mono", monospace; }
+
+  /* Spinner inline */
+  .btn-spinner {
+    width: 14px; height: 14px; border: 2px solid rgba(6,8,10,0.3);
+    border-top-color: #06080a; border-radius: 50%;
+    animation: spin 0.6s linear infinite; display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Resultado */
+  .result-card {
+    background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 12px; overflow: hidden;
+    margin-top: 28px; display: none;
+    animation: slideIn 0.3s cubic-bezier(0.34, 1.3, 0.64, 1);
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-header {
+    padding: 20px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface2);
+  }
+  .result-order {
+    font-family: "IBM Plex Mono", monospace; font-size: 20px; font-weight: 700;
+    color: var(--text);
+  }
+  .result-order span { color: var(--accent); }
+  .result-status { display: flex; align-items: center; gap: 8px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .status-dot.shipped { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .status-dot.pending { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+  .status-dot.unknown { background: var(--muted); }
+  .status-label { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+  .status-label.shipped { color: var(--green); }
+  .status-label.pending { color: var(--yellow); }
+  .status-label.unknown { color: var(--muted2); }
+
+  .result-body { padding: 24px; }
+  .info-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;
+  }
+  .info-block {}
+  .info-label {
+    font-family: "IBM Plex Mono", monospace; font-size: 10px;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em;
+    margin-bottom: 5px;
+  }
+  .info-value { font-size: 14px; font-weight: 500; color: var(--text); line-height: 1.4; }
+  .info-value.mono { font-family: "IBM Plex Mono", monospace; color: var(--accent); letter-spacing: 0.03em; }
+
+  /* Tracking code box */
+  .tracking-box {
+    background: var(--accent-dim); border: 1px solid rgba(0,158,227,0.2);
+    border-radius: 10px; padding: 18px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; margin-bottom: 20px;
+  }
+  .tracking-code-label {
+    font-family: "IBM Plex Mono", monospace; font-size: 10px;
+    color: var(--muted2); text-transform: uppercase; letter-spacing: 0.12em;
+    margin-bottom: 6px;
+  }
+  .tracking-code {
+    font-family: "IBM Plex Mono", monospace; font-size: 17px; font-weight: 700;
+    color: var(--accent); letter-spacing: 0.04em; word-break: break-all;
+  }
+  .copy-btn {
+    background: transparent; border: 1px solid rgba(0,158,227,0.3);
+    border-radius: 6px; padding: 8px 14px; color: var(--accent);
+    font-family: "IBM Plex Sans", sans-serif; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;
+  }
+  .copy-btn:hover { background: rgba(0,158,227,0.1); border-color: var(--accent); }
+  .copy-btn.copied { color: var(--green); border-color: var(--green); background: var(--green-dim); }
+
+  /* Botón principal de tracking */
+  .track-btn {
+    width: 100%; padding: 16px; background: var(--accent);
+    border: none; border-radius: 10px; color: #06080a;
+    font-family: "IBM Plex Sans", sans-serif; font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  .track-btn:hover { background: #00b8ff; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,158,227,0.3); }
+  .track-btn svg { flex-shrink: 0; }
+
+  /* Sin código */
+  .no-tracking {
+    background: var(--yellow-dim); border: 1px solid rgba(245,158,11,0.2);
+    border-radius: 10px; padding: 16px 20px; margin-bottom: 20px;
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .no-tracking-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+  .no-tracking-text { font-size: 13px; color: var(--yellow); line-height: 1.5; }
+  .no-tracking-text strong { display: block; margin-bottom: 3px; font-weight: 600; }
+
+  /* Historial de búsquedas recientes */
+  .recent-title {
+    font-family: "IBM Plex Mono", monospace; font-size: 11px;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em;
+    margin-bottom: 12px; margin-top: 36px;
+  }
+  .recent-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .recent-chip {
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: 20px; padding: 6px 14px;
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted2);
+    cursor: pointer; transition: all 0.15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .recent-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .recent-chip-x {
+    color: var(--muted); font-size: 14px; line-height: 1;
+    margin-left: 2px; padding: 0 2px;
+  }
+  .recent-chip-x:hover { color: var(--red); }
+
+  /* Error */
+  .error-box {
+    background: var(--red-dim); border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 10px; padding: 16px 20px;
+    display: flex; align-items: center; gap: 12px;
+    margin-top: 20px; display: none;
+    animation: slideIn 0.3s ease;
+  }
+  .error-box.show { display: flex; }
+  .error-icon { font-size: 18px; flex-shrink: 0; }
+  .error-text { font-size: 13px; color: var(--red); }
+
+  @media (max-width: 600px) {
+    .wrap { padding: 32px 16px 60px; }
+    .search-box { flex-wrap: wrap; padding: 12px; }
+    .search-prefix { display: none; }
+    .search-btn { width: 100%; justify-content: center; }
+    .info-grid { grid-template-columns: 1fr; }
+    .tracking-box { flex-direction: column; align-items: flex-start; }
+    .copy-btn { width: 100%; text-align: center; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="logo-row">
+    <div class="logo-badge">MG</div>
+    <div class="logo-text">Market Gamer · Tracking</div>
+  </div>
+
+  <div class="hero-title">Rastrear<br><span>envíos</span></div>
+  <div class="hero-sub">Ingresá el número de orden y te llevamos directo al seguimiento en Correo Argentino.</div>
+
+  <div class="search-box" id="searchBox">
+    <div class="search-prefix">orden #</div>
+    <input class="search-input" id="orderInput" type="number" min="1"
+      placeholder="340" autocomplete="off" inputmode="numeric"
+      onkeydown="if(event.key==='Enter') buscarOrden()">
+    <button class="search-btn" id="searchBtn" onclick="buscarOrden()">
+      <div class="btn-spinner" id="btnSpinner"></div>
+      <span id="btnText">Rastrear</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </button>
+  </div>
+  <div class="search-hint">También podés ingresar el código de seguimiento directamente debajo</div>
+
+  <!-- Error -->
+  <div class="error-box" id="errorBox">
+    <div class="error-icon">⚠</div>
+    <div class="error-text" id="errorText">No se encontró la orden.</div>
+  </div>
+
+  <!-- Resultado -->
+  <div class="result-card" id="resultCard">
+    <div class="result-header">
+      <div class="result-order">Orden <span id="resNum">#—</span></div>
+      <div class="result-status">
+        <div class="status-dot" id="statusDot"></div>
+        <div class="status-label" id="statusLabel"></div>
+      </div>
+    </div>
+    <div class="result-body">
+      <div class="info-grid">
+        <div class="info-block">
+          <div class="info-label">Cliente</div>
+          <div class="info-value" id="resCliente">—</div>
+        </div>
+        <div class="info-block">
+          <div class="info-label">Fecha</div>
+          <div class="info-value" id="resFecha">—</div>
+        </div>
+        <div class="info-block">
+          <div class="info-label">Productos</div>
+          <div class="info-value" id="resProductos">—</div>
+        </div>
+        <div class="info-block">
+          <div class="info-label">Total</div>
+          <div class="info-value mono" id="resTotal">—</div>
+        </div>
+      </div>
+
+      <!-- Con código de seguimiento -->
+      <div id="conTracking">
+        <div class="tracking-box">
+          <div>
+            <div class="tracking-code-label">Código de seguimiento</div>
+            <div class="tracking-code" id="resCodigo">—</div>
+          </div>
+          <button class="copy-btn" id="copyBtn" onclick="copiarCodigo()">Copiar</button>
+        </div>
+        <button class="track-btn" id="trackBtn" onclick="abrirTracking()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+          Ver estado en Correo Argentino
+        </button>
+      </div>
+
+      <!-- Sin código -->
+      <div id="sinTracking" style="display:none">
+        <div class="no-tracking">
+          <div class="no-tracking-icon">📦</div>
+          <div class="no-tracking-text">
+            <strong>Sin código de seguimiento todavía</strong>
+            Esta orden aún no tiene código de seguimiento asignado. Revisá más tarde o verificá en el panel de TN.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Búsquedas recientes -->
+  <div id="recentSection" style="display:none">
+    <div class="recent-title">Recientes</div>
+    <div class="recent-list" id="recentList"></div>
+  </div>
+
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// CONFIG — mismo proxy que carritos
+// ─────────────────────────────────────────────────────────────
+// Mismo proxy que carritos pero con type=orders
+const PROXY_URL = "https://polished-thunder-bd63.brunoromeroc.workers.dev/";
+
+var _codigoActual = "";
+
+// ─────────────────────────────────────────────────────────────
+// BUSCAR ORDEN
+// ─────────────────────────────────────────────────────────────
+async function buscarOrden() {
+  const input = document.getElementById("orderInput");
+  const numero = input.value.trim();
+  if (!numero) { input.focus(); return; }
+
+  const btn   = document.getElementById("searchBtn");
+  const spin  = document.getElementById("btnSpinner");
+  const txt   = document.getElementById("btnText");
+  const arrow = btn.querySelector("svg");
+
+  btn.disabled = true;
+  spin.style.display = "block";
+  txt.textContent = "Buscando...";
+  if (arrow) arrow.style.display = "none";
+  ocultarError();
+  document.getElementById("resultCard").style.display = "none";
+
+  try {
+    // Buscar la orden via proxy (evita CORS)
+    const url = `${PROXY_URL}?type=orders&q=${numero}`;
+    const r = await fetch(url);
+
+    if (!r.ok) throw new Error("Error al consultar TN: " + r.status);
+    const lista = await r.json();
+
+    // Buscar la orden exacta por número
+    const orden = lista.find(o => String(o.number) === String(numero));
+    if (!orden) {
+      mostrarError(`No se encontró la orden #${numero}. Verificá el número.`);
+      return;
+    }
+
+    mostrarResultado(orden, numero);
+    guardarReciente(numero);
+
+  } catch(e) {
+    // Si falla CORS, intentar via proxy de ordenes
+    try {
+      await buscarViaProxy(numero);
+    } catch(e2) {
+      mostrarError("No se pudo conectar a Tienda Nube. " + e2.message);
+    }
+  } finally {
+    btn.disabled = false;
+    spin.style.display = "none";
+    txt.textContent = "Rastrear";
+    if (arrow) arrow.style.display = "";
+  }
+}
+
+async function buscarViaProxy(numero) {
+  // Ya estamos usando proxy, no hay fallback adicional
+  throw new Error("No se pudo conectar al proxy.");
+}
+
+// ─────────────────────────────────────────────────────────────
+// MOSTRAR RESULTADO
+// ─────────────────────────────────────────────────────────────
+function mostrarResultado(orden, numero) {
+  // Número
+  document.getElementById("resNum").textContent = "#" + numero;
+
+  // Cliente
+  document.getElementById("resCliente").textContent = orden.contact_name || orden.contact_email || "—";
+
+  // Fecha
+  try {
+    const d = new Date(orden.created_at);
+    document.getElementById("resFecha").textContent =
+      d.toLocaleDateString("es-AR", {day:"2-digit",month:"short",year:"numeric"});
+  } catch(e) { document.getElementById("resFecha").textContent = "—"; }
+
+  // Productos
+  const prods = (orden.products||[]).map(p => {
+    const n = p.name; const q = p.quantity || 1;
+    const nombre = typeof n === "string" ? n : (n && n.es ? n.es : Object.values(n||{})[0] || "Producto");
+    return (q > 1 ? q + "x " : "") + nombre;
+  });
+  document.getElementById("resProductos").textContent = prods.join(", ") || "—";
+
+  // Total
+  const total = parseFloat(orden.total || 0);
+  document.getElementById("resTotal").textContent = "$" + total.toLocaleString("es-AR", {maximumFractionDigits:0});
+
+  // Estado de envío
+  const shipping = orden.shipping_status || "";
+  const dot = document.getElementById("statusDot");
+  const lbl = document.getElementById("statusLabel");
+  if (shipping === "shipped" || shipping === "delivered") {
+    dot.className = "status-dot shipped";
+    lbl.className = "status-label shipped";
+    lbl.textContent = shipping === "delivered" ? "Entregado" : "Enviado";
+  } else if (shipping === "ready_to_ship" || shipping === "packing") {
+    dot.className = "status-dot pending";
+    lbl.className = "status-label pending";
+    lbl.textContent = "Preparando";
+  } else if (!shipping || shipping === "unpacked") {
+    dot.className = "status-dot unknown";
+    lbl.className = "status-label unknown";
+    lbl.textContent = "Sin enviar";
+  } else {
+    dot.className = "status-dot pending";
+    lbl.className = "status-label pending";
+    lbl.textContent = shipping.replace(/_/g," ");
+  }
+
+  // Código de seguimiento — puede estar en fulfillments o en shipping_tracking_number
+  let codigo = "";
+
+  // 1. shipping_tracking_number directo
+  if (orden.shipping_tracking_number) {
+    codigo = String(orden.shipping_tracking_number).trim();
+  }
+
+  // 2. En fulfillments (array de envíos)
+  if (!codigo && orden.fulfillments && orden.fulfillments.length > 0) {
+    for (const f of orden.fulfillments) {
+      if (f.tracking_number) { codigo = String(f.tracking_number).trim(); break; }
+    }
+  }
+
+  // 3. En packages (como en la screenshot: "Código de seguimiento")
+  if (!codigo && orden.packages && orden.packages.length > 0) {
+    for (const pkg of orden.packages) {
+      if (pkg.tracking_number) { codigo = String(pkg.tracking_number).trim(); break; }
+      // A veces viene como shipping_tracking_code dentro del paquete
+      if (pkg.shipping_tracking_code) { codigo = String(pkg.shipping_tracking_code).trim(); break; }
+    }
+  }
+
+  _codigoActual = codigo;
+
+  if (codigo) {
+    document.getElementById("resCodigo").textContent = codigo;
+    document.getElementById("conTracking").style.display = "block";
+    document.getElementById("sinTracking").style.display = "none";
+  } else {
+    document.getElementById("conTracking").style.display = "none";
+    document.getElementById("sinTracking").style.display = "block";
+  }
+
+  document.getElementById("resultCard").style.display = "block";
+  document.getElementById("resultCard").scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+
+// ─────────────────────────────────────────────────────────────
+// ACCIONES
+// ─────────────────────────────────────────────────────────────
+function abrirTracking() {
+  if (!_codigoActual) return;
+  const url = `https://www.correoargentino.com.ar/formularios/e-commerce?id=${encodeURIComponent(_codigoActual)}`;
+  window.open(url, "_blank");
+}
+
+function copiarCodigo() {
+  if (!_codigoActual) return;
+  navigator.clipboard.writeText(_codigoActual).then(() => {
+    const btn = document.getElementById("copyBtn");
+    btn.textContent = "✓ Copiado";
+    btn.classList.add("copied");
+    setTimeout(() => { btn.textContent = "Copiar"; btn.classList.remove("copied"); }, 2000);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// RECIENTES
+// ─────────────────────────────────────────────────────────────
+function guardarReciente(numero) {
+  let recientes = JSON.parse(localStorage.getItem("mg_tracking_recientes") || "[]");
+  recientes = [numero, ...recientes.filter(r => r !== numero)].slice(0, 8);
+  localStorage.setItem("mg_tracking_recientes", JSON.stringify(recientes));
+  renderRecientes();
+}
+
+function borrarReciente(numero, e) {
+  e.stopPropagation();
+  let recientes = JSON.parse(localStorage.getItem("mg_tracking_recientes") || "[]");
+  recientes = recientes.filter(r => r !== numero);
+  localStorage.setItem("mg_tracking_recientes", JSON.stringify(recientes));
+  renderRecientes();
+}
+
+function renderRecientes() {
+  const recientes = JSON.parse(localStorage.getItem("mg_tracking_recientes") || "[]");
+  const section = document.getElementById("recentSection");
+  const list = document.getElementById("recentList");
+  if (!recientes.length) { section.style.display = "none"; return; }
+  section.style.display = "block";
+  list.innerHTML = recientes.map(n => `
+    <div class="recent-chip" onclick="buscarReciente('${n}')">
+      <span>#${n}</span>
+      <span class="recent-chip-x" onclick="borrarReciente('${n}', event)" title="Quitar">×</span>
+    </div>
+  `).join("");
+}
+
+function buscarReciente(numero) {
+  document.getElementById("orderInput").value = numero;
+  buscarOrden();
+}
+
+// ─────────────────────────────────────────────────────────────
+// ERROR
+// ─────────────────────────────────────────────────────────────
+function mostrarError(msg) {
+  const box = document.getElementById("errorBox");
+  document.getElementById("errorText").textContent = msg;
+  box.classList.add("show");
+}
+function ocultarError() {
+  document.getElementById("errorBox").classList.remove("show");
+}
+
+// ─────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────
+renderRecientes();
+document.getElementById("orderInput").focus();
+</script>
+</body>
+</html>
