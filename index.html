@@ -369,13 +369,14 @@
 // ─────────────────────────────────────────────────────────────
 // CONFIG
 // ─────────────────────────────────────────────────────────────
-const TN_TOKEN   = "d393f7ed47519869ca814897a73ef0c591a2894b";
-const TN_STORE   = "6623036";
 const PASSWORD   = "merki";
 
-// Google Apps Script Web App URL — desplegá el script de abajo y pegá la URL acá
-// Por ahora usa localStorage como fallback hasta que configures el Apps Script
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwoVGBCYZzKvieltUkecL42FP7wF5YyeLP2Lxm58DrnVCG4WgURX4zx7xipVuFUWuzi/exec"; // ← pegar URL del Apps Script acá
+// ── Cloudflare Worker proxy (evita el error de CORS con la API de TN) ───────
+// Después de crear el Worker, pegá acá la URL que te da Cloudflare
+const PROXY_URL = "https://polished-thunder-bd63.brunoromeroc.workers.dev/"; // ← Ej: "https://tn-proxy.tuusuario.workers.dev"
+
+// ── Google Apps Script para que el estado "contactado" se comparta entre todos
+const APPS_SCRIPT_URL = ""; // ← pegar URL del Apps Script acá
 
 // ─────────────────────────────────────────────────────────────
 // LOGIN
@@ -473,20 +474,22 @@ async function cargarCarritos() {
   bar.style.width = "30%";
 
   try {
-    const headers = {
-      "Authentication": "bearer " + TN_TOKEN,
-      "User-Agent": "MarketGamerDashboard (info@marketgamer.com.ar)"
-    };
+    if (!PROXY_URL) {
+      showToast("⚠ Falta configurar el Proxy. Ver instrucciones abajo.");
+      btn.disabled = false; spinner.style.display = "none"; btnText.textContent = "⟳ Cargar carritos";
+      bar.style.width = "0%";
+      return;
+    }
 
     let todos = [];
     let page = 1;
     bar.style.width = "50%";
 
     while (true) {
-      const url = `https://api.tiendanube.com/v1/${TN_STORE}/checkouts?per_page=50&page=${page}`;
-      const r = await fetch(url, { headers });
+      const url = `${PROXY_URL}?page=${page}`;
+      const r = await fetch(url);
       if (!r.ok) {
-        if (r.status === 404) break; // sin más páginas
+        if (r.status === 404) break;
         throw new Error("Error API: " + r.status);
       }
       const data = await r.json();
