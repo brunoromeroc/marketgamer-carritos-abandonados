@@ -69,6 +69,10 @@
   .preview-warning-text strong { color: #fff; }
   .preview-warning-btn { background: var(--yellow); border: none; border-radius: 5px; padding: 5px 12px; font-size: 11px; font-weight: 700; color: #080c10; cursor: pointer; font-family: "Outfit", sans-serif; white-space: nowrap; letter-spacing: 0.02em; }
   .preview-warning-btn:hover { background: #ffe340; }
+  .emoji-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; align-items: center; }
+  .emoji-picker-label { font-family: "Space Mono", monospace; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-right: 6px; }
+  .emoji-btn { background: var(--surface3); border: 1px solid var(--border2); border-radius: 6px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; padding: 0; line-height: 1; transition: all 0.12s; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
+  .emoji-btn:hover { background: var(--accent-dim); border-color: var(--accent); transform: translateY(-1px); }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--border); gap: 1px; border-bottom: 1px solid var(--border); }
   .stat { background: var(--surface); padding: 22px 32px; position: relative; overflow: hidden; }
   .stat::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
@@ -152,6 +156,21 @@
     <div class="template-wrap">
       <textarea id="templateMsg">Hola {nombre}! Te habla Agus de Market Gamer Vi que estuviste mirando {producto}. Te quedo alguna duda? Te puedo ayudar a elegir o te armo un precio especial</textarea>
       <div class="template-hint">Variables: <code>{nombre}</code> <code>{producto}</code> <code>{total}</code></div>
+      <div class="emoji-picker">
+        <span class="emoji-picker-label">Emojis</span>
+        <button type="button" class="emoji-btn" onclick="insertarEmoji('\uD83C\uDFAE')" title="Joystick moderno">🎮</button>
+        <button type="button" class="emoji-btn" onclick="insertarEmoji('\uD83D\uDC7E')" title="Alien">👾</button>
+        <button type="button" class="emoji-btn" onclick="insertarEmoji('\uD83D\uDED2')" title="Carrito">🛒</button>
+        <button type="button" class="emoji-btn" onclick="insertarEmoji('\uD83D\uDD25')" title="Fuego">🔥</button>
+        <button type="button" class="emoji-btn" onclick="insertarEmoji('\u2728')" title="Brillos">✨</button>
+        <button type="button" class="emoji-btn" onclick="insertarEmoji('\uD83D\uDC9A')" title="Corazón verde">💚</button>
+        <button type="button" class="emoji-btn" onclick="insertarEmoji('\uD83D\uDE80')" title="Cohete">🚀</button>
+        <button type="button" class="emoji-btn" onclick="insertarEmoji('\uD83C\uDFAF')" title="Diana">🎯</button>
+        <button type="button" class="emoji-btn" onclick="insertarEmoji('\uD83D\uDCAA')" title="Bíceps">💪</button>
+        <button type="button" class="emoji-btn" onclick="insertarEmoji('\u2705')" title="Check">✅</button>
+        <button type="button" class="emoji-btn" onclick="insertarEmoji('\uD83D\uDCAC')" title="Globo de diálogo">💬</button>
+        <button type="button" class="emoji-btn" onclick="insertarEmoji('\uD83D\uDC4B')" title="Saludo">👋</button>
+      </div>
       <div class="preview-wrap">
         <div class="preview-label">Vista previa <span style="font-family:'Outfit',sans-serif;letter-spacing:0;text-transform:none;color:#54656f;font-size:11px">— como lo ve el cliente en WhatsApp</span></div>
         <div class="preview-chat">
@@ -228,12 +247,43 @@ var busqueda = "";
 var _lastContactadosStr = "";
 
 function initTemplate() {
+  const ta = document.getElementById("templateMsg");
   const saved = localStorage.getItem("mg_template");
-  if (saved) document.getElementById("templateMsg").value = saved;
-  document.getElementById("templateMsg").addEventListener("input", function() {
+  if (saved) ta.value = saved;
+  ta.addEventListener("input", function() {
     localStorage.setItem("mg_template", this.value);
     actualizarPreview();
   });
+  // Sanitizar paste: forzar plain text + filtrar caracteres rotos del clipboard
+  // (esto evita que emojis copiados desde WhatsApp Web/apps caigan como � o se corrompan)
+  ta.addEventListener("paste", function(e) {
+    e.preventDefault();
+    const cd = e.clipboardData || window.clipboardData;
+    let text = (cd && cd.getData("text/plain")) || "";
+    text = text
+      .replace(/\uFFFD/g, "")
+      .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, "")
+      .replace(/(^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "$1")
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/\u00A0/g, " ")
+      .normalize("NFC");
+    const s = this.selectionStart, en = this.selectionEnd;
+    this.value = this.value.slice(0, s) + text + this.value.slice(en);
+    this.selectionStart = this.selectionEnd = s + text.length;
+    localStorage.setItem("mg_template", this.value);
+    actualizarPreview();
+  });
+}
+
+function insertarEmoji(emoji) {
+  const ta = document.getElementById("templateMsg");
+  const s = ta.selectionStart, en = ta.selectionEnd;
+  ta.value = ta.value.slice(0, s) + emoji + ta.value.slice(en);
+  ta.selectionStart = ta.selectionEnd = s + emoji.length;
+  ta.focus();
+  localStorage.setItem("mg_template", ta.value);
+  actualizarPreview();
 }
 
 function actualizarPreview() {
@@ -464,7 +514,7 @@ function abrirWA(id) {
   const c = CARRITOS.find(x => x.id === id);
   if (!c) return;
   const t = document.getElementById("templateMsg").value;
-  const msg = t.replace(/{nombre}/g, c.nombreCorto).replace(/{producto}/g, c.producto).replace(/{total}/g, c.totalFmt);
+  const msg = t.replace(/{nombre}/g, c.nombreCorto).replace(/{producto}/g, c.producto).replace(/{total}/g, c.totalFmt).normalize("NFC");
   window.open("https://wa.me/" + c.telefono + "?text=" + encodeURIComponent(msg), "_blank");
   if (!contactados[id]) { contactados[id] = true; guardarEstado(); actualizarStats(); render(); }
 }
