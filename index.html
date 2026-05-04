@@ -519,9 +519,15 @@ function abrirWA(id) {
   if (!c) return;
   const t = document.getElementById("templateMsg").value;
   const msg = t.replace(/{nombre}/g, c.nombreCorto).replace(/{producto}/g, c.producto).replace(/{total}/g, c.totalFmt).normalize("NFC");
-  // api.whatsapp.com/send es más confiable que wa.me con emojis (wa.me redirige y a veces re-codea mal)
-  const url = "https://api.whatsapp.com/send?phone=" + c.telefono + "&text=" + encodeURIComponent(msg);
-  window.open(url, "_blank");
+  // whatsapp:// scheme abre directo la app desktop, sin pasar por web ni mostrar selector
+  const url = "whatsapp://send?phone=" + c.telefono + "&text=" + encodeURIComponent(msg);
+  // Link temporal con click programático: preserva el user gesture y no saca al usuario de la pestaña actual
+  const a = document.createElement("a");
+  a.href = url;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
   if (!contactados[id]) { contactados[id] = true; guardarEstado(); actualizarStats(); render(); }
 }
 
