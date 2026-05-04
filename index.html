@@ -48,11 +48,27 @@
   #templateMsg:focus { border-color: var(--accent2); }
   .template-hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
   .template-hint code { background: var(--surface3); padding: 1px 7px; border-radius: 4px; color: var(--accent); font-family: "Space Mono", monospace; }
-  .preview-wrap { margin-top: 14px; }
+  .preview-wrap { margin-top: 14px; max-width: 520px; }
   .preview-label { font-family: "Space Mono", monospace; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
   .preview-label::after { content: ""; flex: 1; height: 1px; background: var(--border); }
-  .preview-bubble { background: #152515; border: 1px solid #253525; border-radius: 4px 12px 12px 12px; padding: 12px 16px; font-size: 14px; line-height: 1.65; color: #c8e6c9; max-width: 460px; white-space: pre-wrap; word-break: break-word; }
-  .preview-empty { color: var(--muted); font-style: italic; font-size: 13px; }
+  .preview-chat { background: #0b141a; border: 1px solid #1f2c33; border-radius: 8px; padding: 14px 12px; display: flex; justify-content: flex-end; min-height: 60px; background-image: radial-gradient(rgba(255,255,255,0.015) 1px, transparent 1px); background-size: 8px 8px; }
+  .preview-bubble { background: #005c4b; border-radius: 7.5px 0 7.5px 7.5px; padding: 6px 9px 8px 9px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", "Apple Color Emoji", "Segoe UI Emoji", sans-serif; font-size: 14.2px; line-height: 19px; color: #e9edef; max-width: 85%; white-space: pre-wrap; word-wrap: break-word; position: relative; box-shadow: 0 1px 0.5px rgba(0,0,0,0.13); }
+  .preview-bubble::after { content: ""; position: absolute; right: -6px; top: 0; width: 0; height: 0; border-style: solid; border-width: 0 0 8px 8px; border-color: transparent transparent transparent #005c4b; }
+  .preview-bubble strong { font-weight: 700; }
+  .preview-bubble em { font-style: italic; }
+  .preview-bubble s { text-decoration: line-through; opacity: 0.85; }
+  .preview-bubble code.wa-mono { font-family: ui-monospace, "SF Mono", Consolas, "Courier New", monospace; background: rgba(0,0,0,0.25); padding: 0 5px; border-radius: 3px; font-size: 13px; }
+  .preview-bubble code.wa-block { display: block; font-family: ui-monospace, "SF Mono", Consolas, "Courier New", monospace; background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 4px; font-size: 13px; margin: 2px 0; }
+  .preview-bubble a { color: #53bdeb; text-decoration: underline; }
+  .preview-meta { float: right; font-size: 11px; color: rgba(233,237,239,0.6); margin-left: 8px; margin-top: 4px; line-height: 15px; white-space: nowrap; user-select: none; }
+  .preview-meta svg { vertical-align: -3px; margin-left: 2px; }
+  .preview-empty { color: #54656f; font-style: italic; font-size: 13px; }
+  .preview-warning { margin-top: 10px; padding: 10px 14px; background: rgba(255,214,10,0.08); border: 1px solid rgba(255,214,10,0.3); border-radius: 6px; font-size: 12px; color: var(--yellow); display: none; align-items: center; gap: 12px; line-height: 1.5; }
+  .preview-warning.show { display: flex; }
+  .preview-warning-text { flex: 1; }
+  .preview-warning-text strong { color: #fff; }
+  .preview-warning-btn { background: var(--yellow); border: none; border-radius: 5px; padding: 5px 12px; font-size: 11px; font-weight: 700; color: #080c10; cursor: pointer; font-family: "Outfit", sans-serif; white-space: nowrap; letter-spacing: 0.02em; }
+  .preview-warning-btn:hover { background: #ffe340; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--border); gap: 1px; border-bottom: 1px solid var(--border); }
   .stat { background: var(--surface); padding: 22px 32px; position: relative; overflow: hidden; }
   .stat::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
@@ -137,8 +153,14 @@
       <textarea id="templateMsg">Hola {nombre}! Te habla Agus de Market Gamer Vi que estuviste mirando {producto}. Te quedo alguna duda? Te puedo ayudar a elegir o te armo un precio especial</textarea>
       <div class="template-hint">Variables: <code>{nombre}</code> <code>{producto}</code> <code>{total}</code></div>
       <div class="preview-wrap">
-        <div class="preview-label">Vista previa</div>
-        <div class="preview-bubble" id="previewBubble"><span class="preview-empty">Carga los carritos para ver la vista previa...</span></div>
+        <div class="preview-label">Vista previa <span style="font-family:'Outfit',sans-serif;letter-spacing:0;text-transform:none;color:#54656f;font-size:11px">— como lo ve el cliente en WhatsApp</span></div>
+        <div class="preview-chat">
+          <div class="preview-bubble" id="previewBubble"><span class="preview-empty">Carga los carritos para ver la vista previa...</span></div>
+        </div>
+        <div class="preview-warning" id="previewWarning">
+          <span class="preview-warning-text" id="previewWarningText"></span>
+          <button class="preview-warning-btn" onclick="limpiarTextoTemplate()">Limpiar</button>
+        </div>
       </div>
     </div>
   </div>
@@ -217,16 +239,94 @@ function initTemplate() {
 function actualizarPreview() {
   const t = document.getElementById("templateMsg").value;
   const bubble = document.getElementById("previewBubble");
+  const warning = document.getElementById("previewWarning");
   const ejemplo = CARRITOS.find(c => !contactados[c.id]) || CARRITOS[0];
   if (!ejemplo) {
     bubble.innerHTML = '<span class="preview-empty">Carga los carritos para ver la vista previa...</span>';
+    warning.classList.remove("show");
     return;
   }
   const msg = t
     .replace(/{nombre}/g, ejemplo.nombreCorto)
     .replace(/{producto}/g, ejemplo.producto)
     .replace(/{total}/g, ejemplo.totalFmt);
-  bubble.textContent = msg;
+
+  // Detectar caracteres problemáticos en lo que el cliente recibirá
+  const issues = detectarProblemasTexto(msg);
+  if (issues.length > 0) {
+    warning.classList.add("show");
+    const labels = [...new Set(issues.map(i => i.label))];
+    document.getElementById("previewWarningText").innerHTML =
+      "Detecté caracteres que pueden romperse en WhatsApp del cliente: <strong>" +
+      labels.slice(0, 4).join("</strong>, <strong>") + "</strong>" +
+      (labels.length > 4 ? " y " + (labels.length - 4) + " más" : "") +
+      ". Te conviene limpiarlos.";
+  } else {
+    warning.classList.remove("show");
+  }
+
+  // Render con formato WhatsApp + timestamp + doble check
+  const now = new Date();
+  const hora = now.getHours().toString().padStart(2, "0") + ":" + now.getMinutes().toString().padStart(2, "0");
+  const meta =
+    '<span class="preview-meta">' + hora +
+    ' <svg width="16" height="11" viewBox="0 0 16 11" xmlns="http://www.w3.org/2000/svg">' +
+      '<path fill="#53bdeb" d="M11.07 0.65a.5.5 0 0 0-.7 0L4.85 6.18l-.3-.3a.5.5 0 1 0-.7.7l.65.65a.5.5 0 0 0 .7 0L11.07 1.35a.5.5 0 0 0 0-.7z"/>' +
+      '<path fill="#53bdeb" d="M15.07 0.65a.5.5 0 0 0-.7 0L8.85 6.18l-.3-.3a.5.5 0 0 0-.7.7l.65.65a.5.5 0 0 0 .7 0L15.07 1.35a.5.5 0 0 0 0-.7z"/>' +
+    '</svg></span>';
+  bubble.innerHTML = formatearWhatsApp(msg) + meta;
+}
+
+// Convierte sintaxis WhatsApp (*bold* _italic_ ~strike~ `code` ```block``` y URLs) a HTML
+function formatearWhatsApp(texto) {
+  let s = String(texto)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+  // Code block ```...```
+  s = s.replace(/```([\s\S]+?)```/g, function(_, c){ return '<code class="wa-block">' + c + '</code>'; });
+  // Inline code `...`
+  s = s.replace(/`([^`\n]+)`/g, '<code class="wa-mono">$1</code>');
+  // Bold *...*  (delimitado por borde de palabra al estilo WhatsApp)
+  s = s.replace(/(^|[\s\(\[\{>])\*([^\*\n]+?)\*(?=[\s\.,!\?\)\]\}\:\;]|$)/g, "$1<strong>$2</strong>");
+  // Italic _..._
+  s = s.replace(/(^|[\s\(\[\{>])_([^_\n]+?)_(?=[\s\.,!\?\)\]\}\:\;]|$)/g, "$1<em>$2</em>");
+  // Strike ~...~
+  s = s.replace(/(^|[\s\(\[\{>])~([^~\n]+?)~(?=[\s\.,!\?\)\]\}\:\;]|$)/g, "$1<s>$2</s>");
+  // URLs
+  s = s.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  return s;
+}
+
+function detectarProblemasTexto(texto) {
+  const issues = [];
+  if (/\uFFFD/.test(texto)) issues.push({ label: "� (carácter roto)" });
+  if (/[\u201C\u201D]/.test(texto)) issues.push({ label: "comillas curvas" });
+  if (/[\u2018\u2019]/.test(texto)) issues.push({ label: "apóstrofes curvos" });
+  if (/\u00A0/.test(texto)) issues.push({ label: "espacio invisible (NBSP)" });
+  if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(texto)) issues.push({ label: "carácter de control" });
+  // Surrogate suelto (high sin low o low sin high) → emoji corrupto
+  if (/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(texto)) {
+    issues.push({ label: "emoji corrupto" });
+  }
+  return issues;
+}
+
+function limpiarTextoTemplate() {
+  const ta = document.getElementById("templateMsg");
+  let v = ta.value;
+  v = v.replace(/\uFFFD/g, "");
+  v = v.replace(/[\u201C\u201D]/g, '"');
+  v = v.replace(/[\u2018\u2019]/g, "'");
+  v = v.replace(/\u00A0/g, " ");
+  v = v.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+  v = v.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, "");
+  v = v.replace(/(^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "$1");
+  ta.value = v;
+  localStorage.setItem("mg_template", v);
+  actualizarPreview();
+  showToast("Template limpio");
 }
 
 async function cargarEstadoGuardado() {
