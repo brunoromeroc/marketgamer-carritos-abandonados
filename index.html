@@ -220,7 +220,7 @@
 <script>
 const PASSWORD        = "merki";
 const PROXY_URL       = "https://polished-thunder-bd63.brunoromeroc.workers.dev/";
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwoVGBCYZzKvieltUkecL42FP7wF5YyeLP2Lxm58DrnVCG4WgURX4zx7xipVuFUWuzi/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzwV5EcExM-8HXmnsPd3cVbsonJIGQldeT1Ob2j75JbDUz0LWlt9fX45Rf4sKCt5PkU-g/exec";
 
 function checkLogin() {
   const val = document.getElementById("loginInput").value.trim().toLowerCase();
@@ -404,9 +404,10 @@ async function guardarEstado() {
   const str = JSON.stringify(contactados);
   localStorage.setItem("mg_contactados", str);
   try {
+    // text/plain evita preflight OPTIONS (que Apps Script no maneja). El body sigue siendo JSON parseable.
     await fetch(APPS_SCRIPT_URL + "?action=set", {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: {"Content-Type": "text/plain;charset=utf-8"},
       body: JSON.stringify({ contactados })
     });
     _lastContactadosStr = str;
